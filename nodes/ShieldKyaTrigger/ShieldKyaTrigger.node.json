@@ -1,0 +1,10 @@
+{
+	"node": "@shield-agent/n8n-nodes-kya.shieldKyaTrigger",
+	"nodeVersion": "1.0",
+	"codexVersion": "1.0",
+	"categories": ["Development"],
+	"resources": {
+		"credentialDocumentation": [{ "url": "https://shield-agent.com/docs" }],
+		"primaryDocumentation": [{ "url": "https://shield-agent.com/docs" }]
+	}
+}

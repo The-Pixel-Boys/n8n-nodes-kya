@@ -1,0 +1,57 @@
+{
+	"name": "@shield-agent/n8n-nodes-kya",
+	"version": "0.1.0",
+	"description": "n8n nodes for the hosted Shield KYA plane: evaluate tool calls, open and read human approvals, and trigger on signed KYA events.",
+	"license": "MIT",
+	"homepage": "https://shield-agent.com/docs",
+	"keywords": [
+		"n8n-community-node-package",
+		"shield-kya",
+		"ai-agents",
+		"approvals"
+	],
+	"author": {
+		"name": "Shield Agent",
+		"email": "it@shield-agent.com"
+	},
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/The-Pixel-Boys/n8n-nodes-kya.git"
+	},
+	"scripts": {
+		"build": "n8n-node build",
+		"lint": "n8n-node lint",
+		"lint:fix": "n8n-node lint --fix",
+		"test": "node --test \"test/*.test.js\"",
+		"release": "n8n-node release",
+		"prepublishOnly": "n8n-node prerelease"
+	},
+	"files": [
+		"dist",
+		"!dist/**/*.tsbuildinfo"
+	],
+	"publishConfig": {
+		"access": "public",
+		"provenance": true
+	},
+	"n8n": {
+		"n8nNodesApiVersion": 1,
+		"strict": true,
+		"credentials": [
+			"dist/credentials/ShieldKyaApi.credentials.js"
+		],
+		"nodes": [
+			"dist/nodes/ShieldKya/ShieldKya.node.js",
+			"dist/nodes/ShieldKyaTrigger/ShieldKyaTrigger.node.js"
+		]
+	},
+	"devDependencies": {
+		"@n8n/node-cli": "0.52.2",
+		"eslint": "9.32.0",
+		"n8n-workflow": "2.43.2",
+		"typescript": "5.9.2"
+	},
+	"peerDependencies": {
+		"n8n-workflow": "*"
+	}
+}

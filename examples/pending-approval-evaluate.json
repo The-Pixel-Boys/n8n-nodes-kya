@@ -1,0 +1,153 @@
+{
+  "name": "Shield KYA: pending approval -> evaluate -> gate on verdict == ALLOW",
+  "nodes": [
+    {
+      "id": "t",
+      "name": "KYA Trigger",
+      "type": "@shield-agent/n8n-nodes-kya.shieldKyaTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "replace-with-a-uuid",
+      "credentials": {
+        "shieldKyaApi": {
+          "id": "",
+          "name": "Shield KYA API"
+        }
+      },
+      "parameters": {
+        "events": [
+          "kya.approval.pending"
+        ],
+        "options": {}
+      }
+    },
+    {
+      "id": "Evaluate",
+      "name": "Evaluate",
+      "type": "@shield-agent/n8n-nodes-kya.shieldKya",
+      "typeVersion": 1,
+      "position": [
+        400,
+        0
+      ],
+      "credentials": {
+        "shieldKyaApi": {
+          "id": "",
+          "name": "Shield KYA API"
+        }
+      },
+      "parameters": {
+        "operation": "evaluate",
+        "toolId": "={{ $json.data.toolId }}",
+        "toolArguments": "={{ JSON.stringify($json.data) }}",
+        "host": "runtime",
+        "additionalFields": {
+          "irreversible": true
+        }
+      }
+    },
+    {
+      "id": "if",
+      "name": "Verdict is ALLOW",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        800,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "allow",
+              "leftValue": "={{ $json.verdict }}",
+              "rightValue": "ALLOW",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      }
+    },
+    {
+      "id": "act",
+      "name": "Your action (only on ALLOW)",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1100,
+        -100
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "stop",
+      "name": "Stop (DENY, REQUIRE_APPROVE or failed)",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1100,
+        100
+      ],
+      "parameters": {}
+    }
+  ],
+  "connections": {
+    "KYA Trigger": {
+      "main": [
+        [
+          {
+            "node": "Evaluate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Evaluate": {
+      "main": [
+        [
+          {
+            "node": "Verdict is ALLOW",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verdict is ALLOW": {
+      "main": [
+        [
+          {
+            "node": "Your action (only on ALLOW)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Stop (DENY, REQUIRE_APPROVE or failed)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {},
+  "pinData": {}
+}

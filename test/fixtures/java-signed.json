@@ -1,0 +1,7 @@
+{
+  "t": 1791972000,
+  "bodyBase64": "eyJpZCI6ImV2dF9reWFfcGVuZGluZ18wZjliMmExZTNjNGQ0ZTVmOGE5YjBjMWQyZTNmNGE1YiIsInR5cGUiOiJreWEuYXBwcm92YWwucGVuZGluZyIsImFwaVZlcnNpb24iOiJreWEud2ViaG9vay52MSIsImNyZWF0ZWRBdCI6IjIwMjYtMTAtMTRUMTA6MDA6MDBaIiwidGVuYW50SWQiOiI3YzFlMGQyYS0xMTExLTQyMjItODMzMy05NDQ0NTU1NTY2NjYiLCJkYXRhIjp7ImFwcHJvdmFsUmVxdWVzdElkIjoiMGY5YjJhMWUtM2M0ZC00ZTVmLThhOWItMGMxZDJlM2Y0YTViIiwic3RhdHVzIjoiUEVORElORyIsInRvb2xJZCI6Im9yZy5leGFtcGxlLmRhdGEud3JpdGUiLCJhZ2VudE5hbWUiOiJib3Qg4oCmIGNhZsOpIFwicXVvdGVkXCIgPC9zY3JpcHQ+IOKAqCIsImlycmV2ZXJzaWJsZSI6dHJ1ZX19",
+  "secret": "test-secret-not-real-0123456789",
+  "header": "t=1791972000,v1=891883d9a5d83d5d0d90abc6023e33a44f917848bcfd301fbd9425ded7609ca9",
+  "_source": "Produced by core KyaOutboundWebhookSigner.signHeader over a Jackson 2.18.3 serialized envelope (non-ASCII, quotes, U+2028). Generator: nodes/N16/Gen.java in the task folder."
+}

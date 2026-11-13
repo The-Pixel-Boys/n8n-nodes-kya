@@ -1,0 +1,158 @@
+# npm trusted publishing (OIDC) with provenance for @shield-agent/n8n-nodes-kya, in the PUBLIC repo
+# The-Pixel-Boys/n8n-nodes-kya. n8n verifies a community node only when it is published from a public
+# GitHub Actions run with a provenance statement.
+#
+# The source of this file is integrations/n8n/.github/workflows/npm-publish.yml in the private release
+# monorepo. The mirror pipeline (.woodpecker/kya-n8n-mirror.yml) copies it here. Do not edit it here.
+#
+# Trigger: a tag vX.Y.Z. The mirror pipeline pushes that tag when the version in package.json changes.
+# Two jobs. `build` runs dependency code (install, build, lint, test, pack) and has NO id-token.
+# `publish` has the id-token but runs no checkout and no dependency code: it publishes the tarball that
+# `build` made, after it checks name and version of the tarball. A tag whose version differs from
+# package.json is refused (scripts/publish-check.mjs). A version that npm already serves is skipped
+# and the run passes.
+name: npm-publish
+run-name: npm-publish ${{ github.ref_name }}
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: npm-publish-${{ github.ref_name }}
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  TAG: ${{ github.ref_name }}
+  PKG_URL: https://registry.npmjs.org/@shield-agent%2fn8n-nodes-kya
+
+jobs:
+  build:
+    if: github.repository == 'The-Pixel-Boys/n8n-nodes-kya'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    outputs:
+      publish: ${{ steps.check.outputs.publish }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      # A release tag must be on the public main head: a tag on a side commit is refused.
+      - name: Refuse a tag that is not on main
+        run: |
+          [ "$GITHUB_REF_TYPE" = tag ] || { echo "::error::not a tag push (ref type '$GITHUB_REF_TYPE')"; exit 1; }
+          git rev-parse -q --verify refs/remotes/origin/main > /dev/null || { echo "::error::origin/main was not fetched"; exit 1; }
+          git merge-base --is-ancestor "$GITHUB_SHA" origin/main || { echo "::error::tag $TAG is on $GITHUB_SHA, which is not on main"; exit 1; }
+
+      # No registry-url: setup-node would write an .npmrc that reads NODE_AUTH_TOKEN.
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          package-manager-cache: false
+
+      - name: Refuse unless the tag and package.json agree (skip when npm has the version)
+        id: check
+        run: node scripts/publish-check.mjs "$TAG"
+
+      # --ignore-scripts: no dependency lifecycle script runs. This job has no id-token and no secret.
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: npm run build
+      - run: npm run lint
+      - run: npm test
+
+      - name: Pack one tarball
+        if: steps.check.outputs.publish == 'true'
+        run: |
+          out="$RUNNER_TEMP/pkg"
+          mkdir -p "$out"
+          npm pack --ignore-scripts --pack-destination "$out"
+          n=$(find "$out" -maxdepth 1 -name '*.tgz' | wc -l)
+          [ "$n" -eq 1 ] || { echo "::error::want one tarball, got $n"; exit 1; }
+          (cd "$out" && sha256sum ./*.tgz > pkg.sha256 && cat pkg.sha256)
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: steps.check.outputs.publish == 'true'
+        with:
+          name: npm-package
+          path: ${{ runner.temp }}/pkg
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    needs: build
+    if: needs.build.outputs.publish == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          package-manager-cache: false
+
+      - name: npm 11.5.1 or later (trusted publishing)
+        run: |
+          v=$(npm --version)
+          echo "node $(node --version), npm $v"
+          node -e 'const [a,b,c]=process.argv[1].split(".").map(Number); process.exit(a>11||(a===11&&(b>5||(b===5&&c>=1)))?0:1)' "$v" \
+            || { echo "::error::npm $v is older than 11.5.1, which trusted publishing needs"; exit 1; }
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: npm-package
+          path: ${{ runner.temp }}/pkg
+
+      - name: Check the tarball (sha256, name, version equals the tag)
+        run: |
+          cd "$RUNNER_TEMP/pkg"
+          sha256sum -c pkg.sha256
+          n=$(find . -maxdepth 1 -name '*.tgz' | wc -l)
+          [ "$n" -eq 1 ] || { echo "::error::want one tarball, got $n"; exit 1; }
+          tgz=$(find . -maxdepth 1 -name '*.tgz')
+          mkdir x
+          tar -xzf "$tgz" -C x package/package.json
+          m=x/package/package.json
+          [ "$(node -p "require('./$m').name")" = "@shield-agent/n8n-nodes-kya" ] || { echo "::error::wrong tarball name"; exit 1; }
+          [ "v$(node -p "require('./$m').version")" = "$TAG" ] || { echo "::error::tarball version differs from tag $TAG"; exit 1; }
+          echo "TGZ=$RUNNER_TEMP/pkg/${tgz#./}" >> "$GITHUB_ENV"
+
+      # npm reads the OIDC token only in `npm publish`. A credential here would bypass OIDC.
+      - name: Refuse any npm credential before the OIDC exchange
+        run: |
+          if [ -n "${NPM_TOKEN:-}${NODE_AUTH_TOKEN:-}" ]; then echo "::error::a registry token is set in the environment"; exit 1; fi
+
+      - name: Publish with OIDC and provenance (no token)
+        env:
+          NODE_AUTH_TOKEN: ''
+        run: npm publish "$TGZ" --provenance --access public --ignore-scripts --loglevel verbose 2>&1 | tee "$RUNNER_TEMP/publish.log"; [ "${PIPESTATUS[0]}" -eq 0 ]
+
+      - name: Check trusted publisher and provenance on npm
+        run: |
+          VERSION="${TAG#v}"
+          for _ in $(seq 1 20); do
+            if curl -fsS "$PKG_URL/$VERSION" -o "$RUNNER_TEMP/meta.json" 2>/dev/null; then
+              if node -e 'const m=require(process.argv[1]); process.exit(m._npmUser?.trustedPublisher&&m.dist?.attestations?0:1)' "$RUNNER_TEMP/meta.json"; then
+                echo "npm serves @shield-agent/n8n-nodes-kya $VERSION with a trusted publisher and a provenance attestation."
+                exit 0
+              fi
+              echo "::error::npm serves $VERSION without trustedPublisher or attestations. The version is public and immutable: do not publish it again. Fix the trusted publisher and ship the fix in the next version."
+              exit 1
+            fi
+            sleep 15
+          done
+          echo "::error::npm does not serve $VERSION after 5 minutes. A re-run is safe: the build job skips a version that npm serves."
+          exit 1
